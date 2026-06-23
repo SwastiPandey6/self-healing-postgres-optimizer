@@ -1,15 +1,23 @@
 import psycopg2
 import json
 
+# -------------------------------
+# Database Connection
+# -------------------------------
+
 conn = psycopg2.connect(
     host="localhost",
     database="optimizer_db",
     user="postgres",
-    password="postgres",
+    password="postgres",  # Change if your password is different
     port="5432"
 )
 
 cursor = conn.cursor()
+
+# -------------------------------
+# Query to Analyze
+# -------------------------------
 
 query = """
 SELECT *
@@ -17,12 +25,19 @@ FROM orders
 WHERE customer_id = 1000;
 """
 
+# -------------------------------
+# Execute EXPLAIN ANALYZE
+# -------------------------------
+
 cursor.execute(
     "EXPLAIN (ANALYZE, FORMAT JSON) " + query
 )
 
 result = cursor.fetchone()[0]
 
+# -------------------------------
+# Explain Parser
+# -------------------------------
 
 def parse_explain(plan):
 
@@ -36,7 +51,9 @@ def parse_explain(plan):
     }
 
 
-parsed = parse_explain(result)
+# -------------------------------
+# Sequential Scan Detector
+# -------------------------------
 
 def detect_seq_scan(parsed_plan):
 
@@ -47,17 +64,55 @@ def detect_seq_scan(parsed_plan):
         }
 
     return {
-        "problem": "No issue",
-        "severity": "LOW"}
+        "problem": "No issue detected",
+        "severity": "LOW"
+    }
 
+
+# -------------------------------
+# Cost Severity Detector
+# -------------------------------
+
+def detect_cost_severity(parsed_plan):
+
+    cost = parsed_plan["total_cost"]
+
+    if cost > 10000:
+        return "HIGH"
+
+    elif cost > 1000:
+        return "MEDIUM"
+
+    else:
+        return "LOW"
+
+
+# -------------------------------
+# Process Execution Plan
+# -------------------------------
+
+parsed = parse_explain(result)
 
 warning = detect_seq_scan(parsed)
 
-print("\nPARSED PLAN:")
+cost_severity = detect_cost_severity(parsed)
+
+# -------------------------------
+# Display Results
+# -------------------------------
+
+print("\n========== PARSED PLAN ==========")
 print(parsed)
 
-print("\nWARNING:")
+print("\n========== WARNING ==========")
 print(warning)
+
+print("\n========== COST SEVERITY ==========")
+print(cost_severity)
+
+# -------------------------------
+# Cleanup
+# -------------------------------
 
 cursor.close()
 conn.close()
