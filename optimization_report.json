@@ -1,7 +1,7 @@
 {
-    "problem": "Sequential Scan",
-    "index_added": "idx_customer_id",
-    "before_time": 85.12,
-    "after_time": 3.61,
-    "improvement_percent": 95.76
+    "problem": "No Problem",
+    "index_added": "No New Index Created",
+    "before_time": 6.72,
+    "after_time": 0.31,
+    "improvement_percent": 95.44
 }

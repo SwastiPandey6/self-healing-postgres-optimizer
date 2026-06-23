@@ -6,49 +6,94 @@ def generate_html_report(
         improvement):
 
     html = f"""
+    <!DOCTYPE html>
 
     <html>
 
+    <head>
+
+    <title>Optimization Report</title>
+
+    <style>
+
+    body {{
+        font-family: Arial;
+        margin:40px;
+        background-color:#f4f6f9;
+    }}
+
+    .card {{
+        background:white;
+        padding:20px;
+        border-radius:10px;
+        box-shadow:0px 0px 10px gray;
+        width:600px;
+    }}
+
+    h1 {{
+        color:#2E86C1;
+    }}
+
+    table {{
+        width:100%;
+        border-collapse:collapse;
+    }}
+
+    td {{
+        padding:15px;
+        border-bottom:1px solid lightgray;
+    }}
+
+    </style>
+
+    </head>
+
     <body>
 
-    <h1>Optimization Report</h1>
+    <div class="card">
 
-    <hr>
+    <h1>Self-Healing PostgreSQL Optimization Report</h1>
 
-    <h2>Problem</h2>
+    <table>
 
-    <p>{problem}</p>
+    <tr>
+    <td><b>Problem</b></td>
+    <td>{problem}</td>
+    </tr>
 
-    <h2>Index Added</h2>
+    <tr>
+    <td><b>Index Added</b></td>
+    <td>{index_name}</td>
+    </tr>
 
-    <p>{index_name}</p>
+    <tr>
+    <td><b>Before Time</b></td>
+    <td>{before_time:.2f} ms</td>
+    </tr>
 
-    <h2>Before</h2>
+    <tr>
+    <td><b>After Time</b></td>
+    <td>{after_time:.2f} ms</td>
+    </tr>
 
-    <p>{before_time:.2f} ms</p>
+    <tr>
+    <td><b>Improvement</b></td>
+    <td>{improvement:.2f}%</td>
+    </tr>
 
-    <h2>After</h2>
+    </table>
 
-    <p>{after_time:.2f} ms</p>
-
-    <h2>Improvement</h2>
-
-    <p>{improvement:.2f}%</p>
+    </div>
 
     </body>
 
     </html>
-
     """
 
     with open(
-
             "optimization_report.html",
-
             "w",
-
             encoding="utf-8"
-
     ) as file:
 
         file.write(html)
