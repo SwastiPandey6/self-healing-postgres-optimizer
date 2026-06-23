@@ -19,7 +19,7 @@ print("Connected to database...")
 # Generate customers
 customers = []
 
-for i in range(10000):
+for i in range(100000):
     customers.append(
         (
             fake.name(),
