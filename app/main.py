@@ -1,5 +1,5 @@
 import psycopg2
-import json
+import re
 
 # -------------------------------
 # Database Connection
@@ -9,14 +9,14 @@ conn = psycopg2.connect(
     host="localhost",
     database="optimizer_db",
     user="postgres",
-    password="postgres",  # Change if your password is different
+    password="postgres",
     port="5432"
 )
 
 cursor = conn.cursor()
 
 # -------------------------------
-# Query to Analyze
+# Query
 # -------------------------------
 
 query = """
@@ -26,7 +26,7 @@ WHERE customer_id = 1000;
 """
 
 # -------------------------------
-# Execute EXPLAIN ANALYZE
+# Explain Analyze
 # -------------------------------
 
 cursor.execute(
@@ -36,7 +36,7 @@ cursor.execute(
 result = cursor.fetchone()[0]
 
 # -------------------------------
-# Explain Parser
+# Parser
 # -------------------------------
 
 def parse_explain(plan):
@@ -52,7 +52,7 @@ def parse_explain(plan):
 
 
 # -------------------------------
-# Sequential Scan Detector
+# Seq Scan Detector
 # -------------------------------
 
 def detect_seq_scan(parsed_plan):
@@ -64,13 +64,13 @@ def detect_seq_scan(parsed_plan):
         }
 
     return {
-        "problem": "No issue detected",
+        "problem": "No issue",
         "severity": "LOW"
     }
 
 
 # -------------------------------
-# Cost Severity Detector
+# Cost Detector
 # -------------------------------
 
 def detect_cost_severity(parsed_plan):
@@ -83,12 +83,43 @@ def detect_cost_severity(parsed_plan):
     elif cost > 1000:
         return "MEDIUM"
 
-    else:
-        return "LOW"
+    return "LOW"
 
 
 # -------------------------------
-# Process Execution Plan
+# Index Recommendation Engine
+# -------------------------------
+
+def recommend_index(sql_query):
+
+    table_match = re.search(r'FROM\s+(\w+)', sql_query, re.IGNORECASE)
+
+    column_match = re.search(
+        r'WHERE\s+(\w+)',
+        sql_query,
+        re.IGNORECASE
+    )
+
+    if table_match and column_match:
+
+        table_name = table_match.group(1)
+
+        column_name = column_match.group(1)
+
+        index_name = f"idx_{column_name}"
+
+        recommendation = (
+            f"CREATE INDEX {index_name} "
+            f"ON {table_name}({column_name});"
+        )
+
+        return recommendation
+
+    return "No recommendation"
+
+
+# -------------------------------
+# Processing
 # -------------------------------
 
 parsed = parse_explain(result)
@@ -97,8 +128,10 @@ warning = detect_seq_scan(parsed)
 
 cost_severity = detect_cost_severity(parsed)
 
+index_recommendation = recommend_index(query)
+
 # -------------------------------
-# Display Results
+# Output
 # -------------------------------
 
 print("\n========== PARSED PLAN ==========")
@@ -110,9 +143,8 @@ print(warning)
 print("\n========== COST SEVERITY ==========")
 print(cost_severity)
 
-# -------------------------------
-# Cleanup
-# -------------------------------
+print("\n========== INDEX RECOMMENDATION ==========")
+print(index_recommendation)
 
 cursor.close()
 conn.close()
