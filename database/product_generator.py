@@ -23,7 +23,7 @@ categories = [
 
 products = []
 
-for i in range(10000):
+for _ in range(10000):
     products.append(
         (
             random.choice(categories),
