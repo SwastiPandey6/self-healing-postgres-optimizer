@@ -1,6 +1,7 @@
 import psycopg2
 import re
 import time
+import json
 
 # -------------------------------
 # Database Connection
@@ -10,13 +11,17 @@ conn = psycopg2.connect(
     host="localhost",
     database="optimizer_db",
     user="postgres",
-    password="postgres",
+    password="postgres",  # change if different
     port="5432"
 )
 
 conn.autocommit = True
 
 cursor = conn.cursor()
+
+# -------------------------------
+# Query
+# -------------------------------
 
 query = """
 SELECT *
@@ -35,7 +40,7 @@ cursor.fetchall()
 
 end = time.time()
 
-before_time = (end-start)*1000
+before_time = (end - start) * 1000
 
 # -------------------------------
 # EXPLAIN ANALYZE
@@ -53,14 +58,28 @@ result = cursor.fetchone()[0]
 
 def parse_explain(plan):
 
-    plan = plan[0]["Plan"]
+    root = plan[0]["Plan"]
+
+    node_type = root["Node Type"]
+
+    # Look inside child nodes
+    if "Plans" in root:
+
+        child_node = root["Plans"][0]
+
+        node_type = child_node["Node Type"]
 
     return {
-        "node_type": plan["Node Type"],
-        "total_cost": plan["Total Cost"],
-        "actual_time": plan["Actual Total Time"]
-    }
 
+        "node_type": node_type,
+
+        "startup_cost": root["Startup Cost"],
+
+        "total_cost": root["Total Cost"],
+
+        "actual_time": root["Actual Total Time"]
+
+    }
 
 # -------------------------------
 # Seq Scan Detector
@@ -68,14 +87,27 @@ def parse_explain(plan):
 
 def detect_seq_scan(parsed_plan):
 
-    if parsed_plan["node_type"] == "Seq Scan":
-        return True
-
-    return False
-
+    return parsed_plan["node_type"] == "Seq Scan"
 
 # -------------------------------
-# Recommendation Engine
+# Cost Detector
+# -------------------------------
+
+def detect_cost_severity(parsed_plan):
+
+    cost = parsed_plan["total_cost"]
+
+    if cost > 10000:
+        return "HIGH"
+
+    elif cost > 1000:
+        return "MEDIUM"
+
+    else:
+        return "LOW"
+
+# -------------------------------
+# Index Recommendation Engine
 # -------------------------------
 
 def recommend_index(sql_query):
@@ -99,10 +131,25 @@ def recommend_index(sql_query):
 
     return index_name, table_name, column_name
 
+# -------------------------------
+# Process Plan
+# -------------------------------
 
 parsed = parse_explain(result)
 
+cost_severity = detect_cost_severity(parsed)
+
+index_name = "No New Index Created"
+
+problem = "No Problem"
+
+# -------------------------------
+# Self Healing
+# -------------------------------
+
 if detect_seq_scan(parsed):
+
+    problem = "Sequential Scan"
 
     index_name, table_name, column_name = recommend_index(query)
 
@@ -112,7 +159,7 @@ if detect_seq_scan(parsed):
     ON {table_name}({column_name});
     """
 
-    print("\nCreating Index...")
+    print("\nCreating Index...\n")
 
     cursor.execute(create_index_sql)
 
@@ -127,15 +174,22 @@ cursor.fetchall()
 
 end = time.time()
 
-after_time = (end-start)*1000
+after_time = (end - start) * 1000
 
 improvement = (
-    (before_time-after_time)/before_time
-)*100
+    (before_time - after_time)
+    / before_time
+) * 100
 
 # -------------------------------
 # Results
 # -------------------------------
+
+print("\n========== PARSED PLAN ==========")
+print(parsed)
+
+print("\n========== COST SEVERITY ==========")
+print(cost_severity)
 
 print("\n========== RESULTS ==========")
 
@@ -144,6 +198,34 @@ print(f"Before : {before_time:.2f} ms")
 print(f"After : {after_time:.2f} ms")
 
 print(f"Improvement : {improvement:.2f}%")
+
+# -------------------------------
+# JSON Report Generation
+# -------------------------------
+
+report = {
+
+    "problem": problem,
+
+    "index_added": index_name,
+
+    "before_time": round(before_time, 2),
+
+    "after_time": round(after_time, 2),
+
+    "improvement_percent": round(improvement, 2)
+
+}
+
+with open("optimization_report.json", "w") as file:
+
+    json.dump(report, file, indent=4)
+
+print("\nJSON Report Generated!")
+
+# -------------------------------
+# Cleanup
+# -------------------------------
 
 cursor.close()
 conn.close()

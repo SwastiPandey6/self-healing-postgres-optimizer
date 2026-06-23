@@ -1,0 +1,7 @@
+{
+    "problem": "Sequential Scan",
+    "index_added": "idx_customer_id",
+    "before_time": 119.64,
+    "after_time": 1.91,
+    "improvement_percent": 98.4
+}
