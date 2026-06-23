@@ -1,10 +1,21 @@
 def parse_explain(plan):
 
-    plan = plan[0]["Plan"]
+    root = plan[0]["Plan"]
+
+    node_type = root["Node Type"]
+
+    if "Plans" in root:
+        child_node = root["Plans"][0]
+        node_type = child_node["Node Type"]
 
     return {
-        "node_type": plan["Node Type"],
-        "startup_cost": plan["Startup Cost"],
-        "total_cost": plan["Total Cost"],
-        "actual_time": plan["Actual Total Time"]
+
+        "node_type": node_type,
+
+        "startup_cost": root["Startup Cost"],
+
+        "total_cost": root["Total Cost"],
+
+        "actual_time": root["Actual Total Time"]
+
     }
