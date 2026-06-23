@@ -1,5 +1,6 @@
 import psycopg2
 import re
+import time
 
 # -------------------------------
 # Database Connection
@@ -13,11 +14,9 @@ conn = psycopg2.connect(
     port="5432"
 )
 
-cursor = conn.cursor()
+conn.autocommit = True
 
-# -------------------------------
-# Query
-# -------------------------------
+cursor = conn.cursor()
 
 query = """
 SELECT *
@@ -26,7 +25,20 @@ WHERE customer_id = 1000;
 """
 
 # -------------------------------
-# Explain Analyze
+# Benchmark BEFORE
+# -------------------------------
+
+start = time.time()
+
+cursor.execute(query)
+cursor.fetchall()
+
+end = time.time()
+
+before_time = (end-start)*1000
+
+# -------------------------------
+# EXPLAIN ANALYZE
 # -------------------------------
 
 cursor.execute(
@@ -45,7 +57,6 @@ def parse_explain(plan):
 
     return {
         "node_type": plan["Node Type"],
-        "startup_cost": plan["Startup Cost"],
         "total_cost": plan["Total Cost"],
         "actual_time": plan["Actual Total Time"]
     }
@@ -58,41 +69,22 @@ def parse_explain(plan):
 def detect_seq_scan(parsed_plan):
 
     if parsed_plan["node_type"] == "Seq Scan":
-        return {
-            "problem": "Sequential Scan detected",
-            "severity": "HIGH"
-        }
+        return True
 
-    return {
-        "problem": "No issue",
-        "severity": "LOW"
-    }
+    return False
 
 
 # -------------------------------
-# Cost Detector
-# -------------------------------
-
-def detect_cost_severity(parsed_plan):
-
-    cost = parsed_plan["total_cost"]
-
-    if cost > 10000:
-        return "HIGH"
-
-    elif cost > 1000:
-        return "MEDIUM"
-
-    return "LOW"
-
-
-# -------------------------------
-# Index Recommendation Engine
+# Recommendation Engine
 # -------------------------------
 
 def recommend_index(sql_query):
 
-    table_match = re.search(r'FROM\s+(\w+)', sql_query, re.IGNORECASE)
+    table_match = re.search(
+        r'FROM\s+(\w+)',
+        sql_query,
+        re.IGNORECASE
+    )
 
     column_match = re.search(
         r'WHERE\s+(\w+)',
@@ -100,51 +92,58 @@ def recommend_index(sql_query):
         re.IGNORECASE
     )
 
-    if table_match and column_match:
+    table_name = table_match.group(1)
+    column_name = column_match.group(1)
 
-        table_name = table_match.group(1)
+    index_name = f"idx_{column_name}"
 
-        column_name = column_match.group(1)
+    return index_name, table_name, column_name
 
-        index_name = f"idx_{column_name}"
-
-        recommendation = (
-            f"CREATE INDEX {index_name} "
-            f"ON {table_name}({column_name});"
-        )
-
-        return recommendation
-
-    return "No recommendation"
-
-
-# -------------------------------
-# Processing
-# -------------------------------
 
 parsed = parse_explain(result)
 
-warning = detect_seq_scan(parsed)
+if detect_seq_scan(parsed):
 
-cost_severity = detect_cost_severity(parsed)
+    index_name, table_name, column_name = recommend_index(query)
 
-index_recommendation = recommend_index(query)
+    create_index_sql = f"""
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS
+    {index_name}
+    ON {table_name}({column_name});
+    """
+
+    print("\nCreating Index...")
+
+    cursor.execute(create_index_sql)
 
 # -------------------------------
-# Output
+# Benchmark AFTER
 # -------------------------------
 
-print("\n========== PARSED PLAN ==========")
-print(parsed)
+start = time.time()
 
-print("\n========== WARNING ==========")
-print(warning)
+cursor.execute(query)
+cursor.fetchall()
 
-print("\n========== COST SEVERITY ==========")
-print(cost_severity)
+end = time.time()
 
-print("\n========== INDEX RECOMMENDATION ==========")
-print(index_recommendation)
+after_time = (end-start)*1000
+
+improvement = (
+    (before_time-after_time)/before_time
+)*100
+
+# -------------------------------
+# Results
+# -------------------------------
+
+print("\n========== RESULTS ==========")
+
+print(f"Before : {before_time:.2f} ms")
+
+print(f"After : {after_time:.2f} ms")
+
+print(f"Improvement : {improvement:.2f}%")
 
 cursor.close()
 conn.close()
